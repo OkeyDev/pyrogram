@@ -44,6 +44,15 @@ class Storage:
     async def delete(self):
         raise NotImplementedError
 
+    async def get_states(self) -> list[tuple[int, int, int, int, int]]:
+        raise NotImplementedError
+
+    async def update_state(self, states: Tuple[int, int, int, int, int]):
+        raise NotImplementedError
+
+    async def delete_state(self, state_id: int):
+        raise NotImplementedError
+
     async def update_peers(self, peers: List[Tuple[int, int, str, str, str]]):
         raise NotImplementedError
 

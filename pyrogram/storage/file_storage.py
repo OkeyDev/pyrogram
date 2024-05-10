@@ -21,7 +21,7 @@ import os
 import sqlite3
 from pathlib import Path
 
-from .sqlite_storage import SQLiteStorage
+from .sqlite_storage import STATES_TABLE, SQLiteStorage
 
 log = logging.getLogger(__name__)
 
@@ -46,6 +46,11 @@ class FileStorage(SQLiteStorage):
         if version == 2:
             with self.conn:
                 self.conn.execute("ALTER TABLE sessions ADD api_id INTEGER")
+
+            version += 1
+
+        if version == 3:
+            self.conn.executescript(STATES_TABLE)
 
             version += 1
 

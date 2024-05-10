@@ -50,6 +50,7 @@ from pyrogram.handlers.handler import Handler
 from pyrogram.methods import Methods
 from pyrogram.session import Auth, Session
 from pyrogram.storage import FileStorage, MemoryStorage
+from pyrogram.storage.storage import Storage
 from pyrogram.types import User, TermsOfService
 from pyrogram.utils import ainput
 from .dispatcher import Dispatcher
@@ -225,7 +226,8 @@ class Client(Methods):
         takeout: bool = None,
         sleep_threshold: int = Session.SLEEP_THRESHOLD,
         hide_password: bool = False,
-        max_concurrent_transmissions: int = MAX_CONCURRENT_TRANSMISSIONS
+        max_concurrent_transmissions: int = MAX_CONCURRENT_TRANSMISSIONS,
+        storage: Storage | None = None,
     ):
         super().__init__()
 
@@ -261,6 +263,8 @@ class Client(Methods):
             self.storage = MemoryStorage(self.name, self.session_string)
         elif self.in_memory:
             self.storage = MemoryStorage(self.name)
+        elif isinstance(storage, Storage):
+            self.storage = storage
         else:
             self.storage = FileStorage(self.name, self.workdir)
 
@@ -556,6 +560,17 @@ class Client(Methods):
                 pts = getattr(update, "pts", None)
                 pts_count = getattr(update, "pts_count", None)
 
+                if pts:
+                    await self.storage.update_state(
+                        (
+                            utils.get_channel_id(channel_id) if channel_id else 0,
+                            pts,
+                            None,
+                            updates.date,
+                            updates.seq,
+                        )
+                    )
+
                 if isinstance(update, raw.types.UpdateChannelTooLong):
                     log.info(update)
 
@@ -585,7 +600,10 @@ class Client(Methods):
                                 chats.update({c.id: c for c in diff.chats})
 
                 self.dispatcher.updates_queue.put_nowait((update, users, chats))
-        elif isinstance(updates, (raw.types.UpdateShortMessage, raw.types.UpdateShortChatMessage)):
+        elif isinstance(
+            updates, (raw.types.UpdateShortMessage, raw.types.UpdateShortChatMessage)
+        ):
+            await self.storage.update_state((0, updates.pts, None, updates.date, None))
             diff = await self.invoke(
                 raw.functions.updates.GetDifference(
                     pts=updates.pts - updates.pts_count,
@@ -611,6 +629,9 @@ class Client(Methods):
             self.dispatcher.updates_queue.put_nowait((updates.update, {}, {}))
         elif isinstance(updates, raw.types.UpdatesTooLong):
             log.info(updates)
+
+    async def read_missed_messages(self):
+        await self.dispatcher.fill_difference_gap()
 
     async def load_session(self):
         await self.storage.open()
